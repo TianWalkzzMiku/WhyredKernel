@@ -630,6 +630,7 @@ CLANG_FLAGS    += $(call cc-option, -Wno-bool-operation)
 CLANG_FLAGS    += $(call cc-option, -Wno-string-concatenation)
 KBUILD_CFLAGS	+= $(CLANG_FLAGS)
 KBUILD_AFLAGS	+= $(CLANG_FLAGS)
+export CLANG_FLAGS
 endif
 
 # The arch Makefile can set ARCH_{CPP,A,C}FLAGS to override the default
