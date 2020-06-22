@@ -630,6 +630,9 @@ CLANG_FLAGS    += $(call cc-option, -Wno-bool-operation)
 CLANG_FLAGS    += $(call cc-option, -Wno-string-concatenation)
 KBUILD_CFLAGS	+= $(CLANG_FLAGS)
 KBUILD_AFLAGS	+= $(CLANG_FLAGS)
+ifeq ($(ld-name),lld)
+KBUILD_CFLAGS	+= -fuse-ld=lld
+endif
 export CLANG_FLAGS
 endif
 
