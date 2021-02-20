@@ -1485,6 +1485,12 @@ struct task_struct {
 	/* task is frozen/stopped (used by the cgroup freezer) */
 	ANDROID_KABI_USE(1, unsigned frozen:1);
 
+	struct {
+		struct work_struct work;
+		atomic_t running;
+		bool free_stack;
+	} async_free;
+
 	/*
 	 * f9b0c6c556db ("futex: Add mutex around futex exit")
 	 * A struct mutex takes 32 bytes, or 4 64bit entries, so pick off
