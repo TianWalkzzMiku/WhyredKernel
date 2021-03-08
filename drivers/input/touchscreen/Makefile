@@ -104,6 +104,7 @@ obj-$(CONFIG_TOUCHSCREEN_ST)		+= st/
 obj-$(CONFIG_TOUCHSCREEN_COMMON)	+= tp_common.o
 
 # HMI_L6653_A01
+subdir-ccflags-y := -finline-functions -ftree-vectorize -funroll-loops
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_DSX_E7S)	+= synaptics_dsx_e7s/
 obj-$(CONFIG_TOUCHSCREEN_NVT_E7S) 	+= nvt_touch_e7s/
 obj-$(CONFIG_KERNEL_CUSTOM_E7S)	+= lct_tp_fm_info.o
