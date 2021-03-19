@@ -1667,7 +1667,6 @@ static int __ref __offline_pages(unsigned long start_pfn,
 	if (!IS_ALIGNED(end_pfn, pageblock_nr_pages))
 		return -EINVAL;
 
-	lru_cache_disable();
 	mem_hotplug_begin();
 
 	/* This makes hotplug much easier...and readable.
@@ -1707,6 +1706,7 @@ repeat:
 		goto failed_removal;
 
 	cond_resched();
+	lru_add_drain_all();
 
 	pfn = scan_movable_pages(start_pfn, end_pfn);
 	if (pfn) { /* We have movable pages */
@@ -1759,8 +1759,6 @@ repeat:
 	memory_notify(MEM_OFFLINE, &arg);
 	remove_pfn_range_from_zone(zone, start_pfn, nr_pages);
 	mem_hotplug_done();
-	lru_cache_enable();
-
 	return 0;
 
 failed_removal:
@@ -1771,7 +1769,6 @@ failed_removal:
 	/* pushback to free area */
 	undo_isolate_page_range(start_pfn, end_pfn, MIGRATE_MOVABLE);
 	mem_hotplug_done();
-	lru_cache_enable();
 	return ret;
 }
 
