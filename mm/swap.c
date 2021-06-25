@@ -627,13 +627,18 @@ static void lru_lazyfree_fn(struct page *page, struct lruvec *lruvec,
 static void lru_lazyfree_movetail_fn(struct page *page, struct lruvec *lruvec,
 			    void *arg)
 {
+	bool *add_to_tail = (bool *)arg;
+
 	if (PageLRU(page) && !PageUnevictable(page) && PageSwapBacked(page) &&
 		!PageSwapCache(page)) {
 
 		del_page_from_lru_list(page, lruvec);
 		ClearPageActive(page);
 		ClearPageReferenced(page);
-		add_page_to_lru_list_tail(page, lruvec);
+		if (add_to_tail && *add_to_tail)
+			add_page_to_lru_list_tail(page, lruvec);
+		else
+			add_page_to_lru_list(page, lruvec);
 	}
 }
 
@@ -751,7 +756,7 @@ void mark_page_lazyfree(struct page *page)
  * mark_page_lazyfree_movetail() moves @page to the tail of inactive file list.
  * This is done to accelerate the reclaim of @page.
  */
-void mark_page_lazyfree_movetail(struct page *page)
+void mark_page_lazyfree_movetail(struct page *page, bool tail)
 {
 	if (PageLRU(page) && !PageUnevictable(page) && PageSwapBacked(page) &&
 		!PageSwapCache(page)) {
@@ -763,7 +768,7 @@ void mark_page_lazyfree_movetail(struct page *page)
 		get_page(page);
 		if (!pagevec_add(pvec, page) || PageCompound(page))
 			pagevec_lru_move_fn(pvec,
-					lru_lazyfree_movetail_fn, NULL);
+					lru_lazyfree_movetail_fn, &tail);
 		local_irq_restore(flags);
 	}
 }
