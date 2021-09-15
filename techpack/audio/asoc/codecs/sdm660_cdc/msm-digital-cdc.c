@@ -66,6 +66,12 @@ enum {
 	IIR_MAX,
 };
 
+#ifdef CONFIG_SOUND_CONTROL
+static struct snd_soc_codec *sound_control_codec_ptr;
+static int custom_hp_left = 0;
+static int custom_hp_right = 0;
+#endif
+
 static int msm_digcdc_clock_control(bool flag)
 {
 	int ret = -EINVAL;
@@ -1172,6 +1178,11 @@ static int msm_dig_cdc_event_notify(struct notifier_block *block,
 	return 0;
 }
 
+#ifdef CONFIG_SOUND_CONTROL
+	snd_soc_write(sound_control_codec_ptr, MSM89XX_CDC_CORE_RX1_VOL_CTL_B2_CTL, custom_hp_left);
+	snd_soc_write(sound_control_codec_ptr, MSM89XX_CDC_CORE_RX2_VOL_CTL_B2_CTL, custom_hp_right);
+#endif
+
 static ssize_t msm_dig_codec_version_read(struct snd_info_entry *entry,
 					  void *file_private_data,
 					  struct file *file,
@@ -1296,7 +1307,6 @@ static void sdm660_tx_mute_update_callback(struct work_struct *work)
 }
 
 #ifdef CONFIG_SOUND_CONTROL
-static struct snd_soc_codec *sound_control_codec_ptr;
 static int speaker_gain_val = 6;
 int sound_control_speaker_gain(int gain);
 
@@ -1322,6 +1332,9 @@ static ssize_t headphone_gain_store(struct kobject *kobj,
 
 	if (input_r < -84 || input_r > 40)
 		input_r = 0;
+
+        custom_hp_left = input_l;
+        custom_hp_right = input_r;
 
 	snd_soc_component_write(sound_control_codec_ptr, MSM89XX_CDC_CORE_RX1_VOL_CTL_B2_CTL, input_l);
 	snd_soc_component_write(sound_control_codec_ptr, MSM89XX_CDC_CORE_RX2_VOL_CTL_B2_CTL, input_r);
