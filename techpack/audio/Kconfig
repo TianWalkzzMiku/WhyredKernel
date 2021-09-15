@@ -162,6 +162,8 @@ config WCD_DSP_GLINK
 	tristate "WCD_DSP_GLINK"
 config WSA_MACRO
 	tristate "WSA_MACRO"
+config SOUND_CONTROL
+	bool "Sound Control for msm89xx"
 config SND_SOC_TAS2557
 	tristate "Texas Instruments TAS2557 SmartAmp(R)"
 config TAS2557_REGMAP
