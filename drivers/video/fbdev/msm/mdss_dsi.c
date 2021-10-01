@@ -2876,6 +2876,7 @@ static struct attribute_group mdss_dsi_fs_attrs_group = {
 };
 
 bool dsi_screen_on __read_mostly = false;
+extern void zram_set_screen_state(bool on);
 
 static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 				  int event, void *arg)
@@ -2932,6 +2933,7 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		if (ctrl_pdata->on_cmds.link_state == DSI_HS_MODE)
 			rc = mdss_dsi_unblank(pdata);
 		pdata->panel_info.esd_rdy = true;
+		zram_set_screen_state(true);
 		WRITE_ONCE(dsi_screen_on, true);
 		wmb();
 		break;
@@ -2946,6 +2948,7 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		if (ctrl_pdata->off_cmds.link_state == DSI_LP_MODE)
 			rc = mdss_dsi_blank(pdata, power_state);
 		rc = mdss_dsi_off(pdata, power_state);
+		zram_set_screen_state(false);
 		WRITE_ONCE(dsi_screen_on, false);
 		wmb();
 		trigger_proactive_compaction(false);
