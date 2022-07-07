@@ -5,10 +5,9 @@ kind: pipeline
 name: WHYRED
 steps:
   - name: val
-    image: archlinux:base-devel
+    image: debian:stable-slim
     commands:
-      - curl -LO "https://repo.archlinuxcn.org/x86_64/glibc-linux4-2.33-4-x86_64.pkg.tar.zst" && bsdtar -C / -xvf "glibc-linux4-2.33-4-x86_64.pkg.tar.zst"
-      - pacman -Sy && pacman -S git bc inetutils python2 zip jdk-openjdk --noconfirm
+      - apt-get update && apt-get install -y bison build-essential bc bison curl libssl-dev git zip python python3 flex cpio libncurses5-dev wget default-jre
       - curl https://raw.githubusercontent.com/Mocaness/myscripts/main/gcc.sh | bash
     environment: 
       TELEGRAM_TOKEN: 
