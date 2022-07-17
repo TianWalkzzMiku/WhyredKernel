@@ -2980,7 +2980,7 @@ void free_unref_page(struct page *page)
 	migratetype = get_pcppage_migratetype(page);
 	if (unlikely(migratetype > MIGRATE_RECLAIMABLE)) {
 		if (unlikely(is_migrate_isolate(migratetype))) {
-			free_one_page(page_zone(page), page, pfn, 0, migratetype, FPI_NONE);
+			free_one_page(page_zone(page), page, pfn, 0, migratetype);
 			return;
 		}
 		if (migratetype == MIGRATE_HIGHATOMIC)
@@ -2992,8 +2992,7 @@ void free_unref_page(struct page *page)
 	local_irq_restore(flags);
 
 	if (unlikely(!freed_pcp))
-		free_one_page(page_zone(page), page, pfn, 0, migratetype,
-			      FPI_NONE);
+		free_one_page(page_zone(page), page, pfn, 0, migratetype);
 }
 
 /*
@@ -3033,7 +3032,7 @@ void free_unref_page_list(struct list_head *list)
 			if (unlikely(is_migrate_isolate(migratetype))) {
 				list_del(&page->lru);
 				free_one_page(page_zone(page), page, pfn, 0,
-							migratetype, FPI_NONE);
+							migratetype);
 				continue;
 			}
 
@@ -3086,7 +3085,7 @@ void free_unref_page_list(struct list_head *list)
 		 */
 		if (!free_unref_page_commit(page, migratetype, true))
 			free_one_page(page_zone(page), page, page_to_pfn(page),
-				      0, migratetype, FPI_NONE);
+				      0, migratetype);
 
 		/*
 		 * Guard against excessive IRQ disabled times when we get
@@ -3228,11 +3227,9 @@ struct page *rmqueue_buddy(struct zone *preferred_zone, struct zone *zone,
 		if (!page) {
 			if (migratetype == MIGRATE_MOVABLE &&
 					alloc_flags & ALLOC_CMA)
-				page = __rmqueue_cma(zone, order, migratetype,
-						     alloc_flags);
+				page = __rmqueue_cma(zone, order);
 			if (!page)
-				page = __rmqueue(zone, order, migratetype,
-						 alloc_flags);
+				page = __rmqueue(zone, order, migratetype);
 		}
 		if (!page) {
 			spin_unlock_irqrestore(&zone->lock, flags);
