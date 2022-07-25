@@ -134,4 +134,6 @@ do {								\
 	1 : ({ local_irq_restore(flags); 0; }); \
 })
 
+#define rwlock_is_contended(lock) (((void)(lock), 0))
+
 #endif /* __LINUX_RWLOCK_H */
