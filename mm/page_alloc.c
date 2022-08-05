@@ -2708,18 +2708,18 @@ retry:
 }
 
 #ifdef CONFIG_CMA
-static struct page *__rmqueue_cma(struct zone *zone, unsigned int order)
+static struct page *__rmqueue_cma(struct zone *zone, unsigned int order,
+				  int migratetype,
+				  unsigned int alloc_flags)
 {
-	struct page *page = 0;
-
-	if (IS_ENABLED(CONFIG_CMA))
-		if (!zone->cma_alloc)
-			page = __rmqueue_cma_fallback(zone, order);
+	struct page *page = __rmqueue_cma_fallback(zone, order);
 	trace_mm_page_alloc_zone_locked(page, order, MIGRATE_CMA);
 	return page;
 }
 #else
-static inline struct page *__rmqueue_cma(struct zone *zone, unsigned int order)
+static inline struct page *__rmqueue_cma(struct zone *zone, unsigned int order,
+					 int migratetype,
+					 unsigned int alloc_flags)
 {
 	return NULL;
 }
@@ -2747,7 +2747,8 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 		 * CMA utlization.
 		 */
 		if (is_migrate_cma(migratetype))
-			page = __rmqueue_cma(zone, order);
+			page = __rmqueue_cma(zone, order, migratetype,
+								alloc_flags);
 		else
 			page = __rmqueue(zone, order, migratetype,
 								alloc_flags);
