@@ -63,8 +63,6 @@
 #include <asm/system_misc.h>
 #include <soc/qcom/minidump.h>
 
-#include <soc/qcom/lpm_levels.h>
-
 #define CREATE_TRACE_POINTS
 #include <trace/events/ipi.h>
 
