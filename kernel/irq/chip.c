@@ -578,6 +578,8 @@ EXPORT_SYMBOL_GPL(handle_simple_irq);
  */
 void handle_untracked_irq(struct irq_desc *desc)
 {
+	unsigned int flags = 0;
+
 	raw_spin_lock(&desc->lock);
 
 	if (!irq_may_run(desc))
@@ -594,7 +596,7 @@ void handle_untracked_irq(struct irq_desc *desc)
 	irqd_set(&desc->irq_data, IRQD_IRQ_INPROGRESS);
 	raw_spin_unlock(&desc->lock);
 
-	__handle_irq_event_percpu(desc);
+	__handle_irq_event_percpu(desc, &flags);
 
 	raw_spin_lock(&desc->lock);
 	irqd_clear(&desc->irq_data, IRQD_IRQ_INPROGRESS);
