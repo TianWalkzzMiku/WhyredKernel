@@ -345,9 +345,19 @@ extern void lru_add_page_tail(struct page *page, struct page *page_tail,
 extern void activate_page(struct page *);
 extern void mark_page_accessed(struct page *);
 
-extern bool lru_cache_disabled(void);
+extern atomic_t lru_disable_count;
+
+static inline bool lru_cache_disabled(void)
+{
+	return atomic_read(&lru_disable_count);
+}
+
+static inline void lru_cache_enable(void)
+{
+	atomic_dec(&lru_disable_count);
+}
+
 extern void lru_cache_disable(void);
-extern void lru_cache_enable(void);
 extern void lru_add_drain(void);
 extern void lru_add_drain_cpu(int cpu);
 extern void lru_add_drain_all(void);
