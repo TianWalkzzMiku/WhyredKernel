@@ -8465,7 +8465,7 @@ static int __alloc_contig_migrate_range(struct compact_control *cc,
 	unsigned int tries = 0;
 	int ret = 0;
 
-	lru_cache_disable();
+	migrate_prep();
 
 	while (pfn < end || !list_empty(&cc->migratepages)) {
 		if (fatal_signal_pending(current)) {
@@ -8494,7 +8494,7 @@ static int __alloc_contig_migrate_range(struct compact_control *cc,
 				    NULL, 0, cc->mode, MR_CONTIG_RANGE);
 	}
 
-	lru_cache_enable();
+	migrate_finish();
 	if (ret < 0) {
 		putback_movable_pages(&cc->migratepages);
 		return ret;
