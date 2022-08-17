@@ -1139,8 +1139,6 @@ int do_migrate_pages(struct mm_struct *mm, const nodemask_t *from,
 			break;
 	}
 	up_read(&mm->mmap_sem);
-
-	migrate_finish();
 	if (err < 0)
 		return err;
 	return busy;
@@ -1306,8 +1304,6 @@ up_out:
 	up_write(&mm->mmap_sem);
 mpol_out:
 	mpol_put(new);
-	if (flags & (MPOL_MF_MOVE | MPOL_MF_MOVE_ALL))
-		migrate_finish();
 	return err;
 }
 
