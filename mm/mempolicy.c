@@ -1055,7 +1055,7 @@ int do_migrate_pages(struct mm_struct *mm, const nodemask_t *from,
 	int err = 0;
 	nodemask_t tmp;
 
-	migrate_prep();
+	lru_add_drain_all();
 
 	down_read(&mm->mmap_sem);
 
@@ -1254,7 +1254,7 @@ static long do_mbind(unsigned long start, unsigned long len,
 
 	if (flags & (MPOL_MF_MOVE | MPOL_MF_MOVE_ALL)) {
 
-		migrate_prep();
+		lru_add_drain_all();
 	}
 	{
 		NODEMASK_SCRATCH(scratch);
