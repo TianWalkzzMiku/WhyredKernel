@@ -239,11 +239,11 @@ long oom_badness(struct task_struct *p, unsigned long totalpages)
 	return points;
 }
 
-static const char * const oom_constraint_text[] = {
-	[CONSTRAINT_NONE] = "CONSTRAINT_NONE",
-	[CONSTRAINT_CPUSET] = "CONSTRAINT_CPUSET",
-	[CONSTRAINT_MEMORY_POLICY] = "CONSTRAINT_MEMORY_POLICY",
-	[CONSTRAINT_MEMCG] = "CONSTRAINT_MEMCG",
+enum oom_constraint {
+	CONSTRAINT_NONE,
+	CONSTRAINT_CPUSET,
+	CONSTRAINT_MEMORY_POLICY,
+	CONSTRAINT_MEMCG,
 };
 
 /*
@@ -442,25 +442,16 @@ void dump_tasks(struct oom_control *oc)
 	}
 }
 
-static void dump_oom_summary(struct oom_control *oc, struct task_struct *victim)
-{
-	/* one line summary of the oom killer context. */
-	pr_info("oom-kill:constraint=%s,nodemask=%*pbl",
-			oom_constraint_text[oc->constraint],
-			nodemask_pr_args(oc->nodemask));
-	cpuset_print_current_mems_allowed();
-	pr_cont(",task=%s,pid=%d,uid=%d\n", victim->comm, victim->pid,
-		from_kuid(&init_user_ns, task_uid(victim)));
-}
-
 static void dump_header(struct oom_control *oc, struct task_struct *p)
 {
-	pr_warn("%s invoked oom-killer: gfp_mask=%#x(%pGg), order=%d, oom_score_adj=%hd\n",
-		current->comm, oc->gfp_mask, &oc->gfp_mask, oc->order,
+	pr_warn("%s invoked oom-killer: gfp_mask=%#x(%pGg), nodemask=%*pbl, order=%d, oom_score_adj=%hd\n",
+		current->comm, oc->gfp_mask, &oc->gfp_mask,
+		nodemask_pr_args(oc->nodemask), oc->order,
 			current->signal->oom_score_adj);
 	if (!IS_ENABLED(CONFIG_COMPACTION) && oc->order)
 		pr_warn("COMPACTION is disabled!!!\n");
 
+	cpuset_print_current_mems_allowed();
 	dump_stack();
 	if (is_memcg_oom(oc))
 		mem_cgroup_print_oom_info(oc->memcg, p);
@@ -474,8 +465,6 @@ static void dump_header(struct oom_control *oc, struct task_struct *p)
 
 	if (sysctl_oom_dump_tasks)
 		dump_tasks(oc);
-	if (p)
-		dump_oom_summary(oc, p);
 }
 
 /*
