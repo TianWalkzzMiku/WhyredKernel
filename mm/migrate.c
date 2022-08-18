@@ -61,7 +61,7 @@
  * to be migrated using isolate_lru_page(). If scheduling work on other CPUs is
  * undesirable, use migrate_prep_local()
  */
-void migrate_prep(void)
+int migrate_prep(void)
 {
 	/*
 	 * Clear the LRU lists so pages can be isolated.
@@ -70,12 +70,16 @@ void migrate_prep(void)
 	 * pages that may be busy.
 	 */
 	lru_add_drain_all();
+
+	return 0;
 }
 
 /* Do the necessary work of migrate_prep but not if it involves other CPUs */
-void migrate_prep_local(void)
+int migrate_prep_local(void)
 {
 	lru_add_drain();
+
+	return 0;
 }
 
 int isolate_movable_page(struct page *page, isolate_mode_t mode)
