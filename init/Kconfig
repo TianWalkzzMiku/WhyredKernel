@@ -65,7 +65,7 @@ config CROSS_COMPILE
 
 config COMPILE_TEST
 	bool "Compile also drivers which will not load"
-	default n
+	depends on HAS_IOMEM
 	help
 	  Some drivers can be compiled on a different platform than they are
 	  intended to be run on. Despite they cannot be loaded there (or even
@@ -956,6 +956,55 @@ config PELT_HALFLIFE_8
 
 endchoice
 
+config UCLAMP_TASK
+	bool "Enable utilization clamping for RT/FAIR tasks"
+	depends on CPU_FREQ_GOV_SCHEDUTIL
+	help
+	  This feature enables the scheduler to track the clamped utilization
+	  of each CPU based on RUNNABLE tasks scheduled on that CPU.
+
+	  With this option, the user can specify the min and max CPU
+	  utilization allowed for RUNNABLE tasks. The max utilization defines
+	  the maximum frequency a task should use while the min utilization
+	  defines the minimum frequency it should use.
+
+	  Both min and max utilization clamp values are hints to the scheduler,
+	  aiming at improving its frequency selection policy, but they do not
+	  enforce or grant any specific bandwidth for tasks.
+
+	  If in doubt, say N.
+
+config UCLAMP_BUCKETS_COUNT
+	int "Number of supported utilization clamp buckets"
+	range 5 20
+	default 5
+	depends on UCLAMP_TASK
+	help
+	  Defines the number of clamp buckets to use. The range of each bucket
+	  will be SCHED_CAPACITY_SCALE/UCLAMP_BUCKETS_COUNT. The higher the
+	  number of clamp buckets the finer their granularity and the higher
+	  the precision of clamping aggregation and tracking at run-time.
+
+	  For example, with the minimum configuration value we will have 5
+	  clamp buckets tracking 20% utilization each. A 25% boosted tasks will
+	  be refcounted in the [20..39]% bucket and will set the bucket clamp
+	  effective value to 25%.
+	  If a second 30% boosted task should be co-scheduled on the same CPU,
+	  that task will be refcounted in the same bucket of the first task and
+	  it will boost the bucket clamp effective value to 30%.
+	  The clamp effective value of a bucket is reset to its nominal value
+	  (20% in the example above) when there are no more tasks refcounted in
+	  that bucket.
+
+	  An additional boost/capping margin can be added to some tasks. In the
+	  example above the 25% task will be boosted to 30% until it exits the
+	  CPU. If that should be considered not acceptable on certain systems,
+	  it's always possible to reduce the margin by increasing the number of
+	  clamp buckets to trade off used memory for run-time tracking
+	  precision.
+
+	  If in doubt, use the default value.
+
 endmenu # Scheduler features"
 
 #
@@ -1039,6 +1088,28 @@ config CGROUP_FREEZER
 	  Provides a way to freeze and unfreeze all tasks in a
 	  cgroup.
 
+config UCLAMP_TASK_GROUP
+	bool "Utilization clamping per group of tasks"
+	depends on CGROUP_SCHED
+	depends on UCLAMP_TASK
+	default n
+	help
+	  This feature enables the scheduler to track the clamped utilization
+	  of each CPU based on RUNNABLE tasks currently scheduled on that CPU.
+
+	  When this option is enabled, the user can specify a min and max
+	  CPU bandwidth which is allowed for each single task in a group.
+	  The max bandwidth allows to clamp the maximum frequency a task
+	  can use, while the min bandwidth allows to define a minimum
+	  frequency a task will always use.
+
+	  When task group based utilization clamping is enabled, an eventually
+	  specified task-specific clamp value is constrained by the cgroup
+	  specified clamp value. Both minimum and maximum task clamping cannot
+	  be bigger than the corresponding clamping defined at task group level.
+
+	  If in doubt, say N.
+
 config CGROUP_PIDS
 	bool "PIDs cgroup subsystem"
 	help
@@ -1101,23 +1172,6 @@ config CGROUP_SCHEDTUNE
 
 config PAGE_COUNTER
        bool
-
-config CGROUP_SCHEDTUNE
-	bool "CFS tasks boosting cgroup subsystem (EXPERIMENTAL)"
-	depends on SCHED_TUNE
-	help
-	  This option provides the "schedtune" controller which improves the
-	  flexibility of the task boosting mechanism by introducing the support
-	  to define "per task" boost values.
-
-	  This new controller:
-	  1. allows only a two layers hierarchy, where the root defines the
-	     system-wide boost value and its direct childrens define each one a
-	     different "class of tasks" to be boosted with a different value
-	  2. supports up to 16 different task classes, each one which could be
-	     configured with a different boost value
-
-	  Say N if unsure.
 
 config MEMCG
 	bool "Memory Resource Controller for Control Groups"
@@ -1264,10 +1318,27 @@ config DEBUG_BLK_CGROUP
 	Enable some debugging help. Currently it exports additional stat
 	files in a cgroup which can be useful for debugging.
 
+config CGROUP_BPF
+        bool "Support for eBPF programs attached to cgroups"
+        depends on BPF_SYSCALL
+        select SOCK_CGROUP_DATA
+        help
+          Allow attaching eBPF programs to a cgroup using the bpf(2)
+          syscall command BPF_PROG_ATTACH.
+
+          In which context these programs are accessed depends on the type
+          of attachment. For instance, programs that are attached using
+          BPF_CGROUP_INET_INGRESS will be executed on the ingress path of
+          inet sockets.
+
 config CGROUP_WRITEBACK
 	bool
 	depends on MEMCG && BLK_CGROUP
 	default y
+
+config SOCK_CGROUP_DATA
+	bool
+	default n
 
 endif # CGROUPS
 
@@ -1357,6 +1428,7 @@ config SCHED_AUTOGROUP
 
 config SCHED_TUNE
 	bool "Boosting for CFS tasks (EXPERIMENTAL)"
+	depends on !UCLAMP_TASK
 	depends on SMP
 	help
 	  This option enables the system-wide support for task boosting.
@@ -1400,6 +1472,12 @@ config CPUSETS_ASSIST
 
 	  If unsure, say N.
 
+config UCLAMP_ASSIST
+	bool "UClamp configuration helper"
+	depends on CPUSETS && ANDROID && UCLAMP_TASK && UCLAMP_TASK_GROUP
+	help
+	  This option enabled in-kernel uclamp setting overrides.
+
 config DYNAMIC_STUNE_BOOST
 	bool "Dynamic SchedTune boosting support"
 	depends on SCHED_TUNE && CGROUP_SCHEDTUNE
@@ -1409,6 +1487,13 @@ config DYNAMIC_STUNE_BOOST
 
 	  If unsure, say N.
 
+config SCHED_TUNE_DUMMY
+	bool "Create dummy SCHEDTUNE nodes"
+	depends on SMP
+	depends on !SCHED_TUNE && !CGROUP_SCHEDTUNE
+	help
+	  Create dummy SCHEDTUNE nodes.
+ 
 config DEFAULT_USE_ENERGY_AWARE
 	bool "Default to enabling the Energy Aware Scheduler feature"
 	default n
@@ -1786,6 +1871,16 @@ config ADVISE_SYSCALLS
 	  usage, improving performance. If building an embedded system where no
 	  applications use these syscalls, you can disable this option to save
 	  space.
+
+config BPF_UNPRIV_DEFAULT_OFF
+	bool "Disable unprivileged BPF by default"
+	depends on BPF_SYSCALL
+	help
+	  Disables unprivileged BPF by default by setting the corresponding
+	  /proc/sys/kernel/unprivileged_bpf_disabled knob to 2. An admin can
+	  still reenable it by setting it to 0 later on, or permanently
+	  disable it by setting it to 1 (from which no other transition to
+	  0 is possible anymore).
 
 config USERFAULTFD
 	bool "Enable userfaultfd() system call"

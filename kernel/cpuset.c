@@ -59,6 +59,7 @@
 #include <linux/mutex.h>
 #include <linux/cgroup.h>
 #include <linux/wait.h>
+#include <linux/binfmts.h>
 
 struct static_key cpusets_pre_enable_key __read_mostly = STATIC_KEY_INIT_FALSE;
 struct static_key cpusets_enabled_key __read_mostly = STATIC_KEY_INIT_FALSE;
@@ -1698,6 +1699,11 @@ out_unlock:
 	return retval;
 }
 
+#ifdef CONFIG_UCLAMP_ASSIST
+static void uclamp_set(struct kernfs_open_file *of,
+		size_t nbytes, loff_t off);
+#endif
+
 /*
  * Common handling for a write to a "cpus" or "mems" file.
  */
@@ -1755,6 +1761,12 @@ static ssize_t cpuset_write_resmask(struct kernfs_open_file *of,
 	}
 
 	free_trial_cpuset(trialcs);
+
+#ifdef CONFIG_UCLAMP_ASSIST
+	// Uclamp Assist: Only overwrite if current task is booster.
+	if (task_is_booster(current))
+		uclamp_set(of, nbytes, off);
+#endif
 out_unlock:
 	mutex_unlock(&cpuset_mutex);
 	put_online_cpus();
@@ -1791,7 +1803,7 @@ static ssize_t cpuset_write_resmask_wrapper(struct kernfs_open_file *of,
 	struct cpuset *cs = css_cs(of_css(of));
 	int i;
 
-	if (!strcmp(current->comm, "init") || !strcmp(current->comm, "init.qcom.post_")) {
+	if (task_is_booster(current)) {
 		for (i = 0; i < ARRAY_SIZE(cs_targets); i++) {
 			struct cs_target tgt = cs_targets[i];
 
@@ -1889,6 +1901,27 @@ static s64 cpuset_read_s64(struct cgroup_subsys_state *css, struct cftype *cft)
 	return 0;
 }
 
+#ifdef CONFIG_UCLAMP_TASK_GROUP
+int cpu_uclamp_min_show_wrapper(struct seq_file *sf, void *v);
+int cpu_uclamp_max_show_wrapper(struct seq_file *sf, void *v);
+
+ssize_t cpu_uclamp_min_write_wrapper(struct kernfs_open_file *of,
+				    char *buf, size_t nbytes,
+				    loff_t off);
+ssize_t cpu_uclamp_max_write_wrapper(struct kernfs_open_file *of,
+				    char *buf, size_t nbytes,
+				    loff_t off);
+
+int cpu_uclamp_ls_write_u64_wrapper(struct cgroup_subsys_state *css,
+				   struct cftype *cftype, u64 ls);
+u64 cpu_uclamp_ls_read_u64_wrapper(struct cgroup_subsys_state *css,
+				  struct cftype *cft);
+
+int cpu_uclamp_boost_write_u64_wrapper(struct cgroup_subsys_state *css,
+				   struct cftype *cftype, u64 boost);
+u64 cpu_uclamp_boost_read_u64_wrapper(struct cgroup_subsys_state *css,
+				  struct cftype *cft);
+#endif
 
 /*
  * for the common functions, 'private' gives the type of file
@@ -1992,9 +2025,79 @@ static struct cftype files[] = {
 		.write_u64 = cpuset_write_u64,
 		.private = FILE_MEMORY_PRESSURE_ENABLED,
 	},
-
+#ifdef CONFIG_UCLAMP_TASK_GROUP
+	{
+		.name = "uclamp.min",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = cpu_uclamp_min_show_wrapper,
+		.write = cpu_uclamp_min_write_wrapper,
+	},
+	{
+		.name = "uclamp.max",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = cpu_uclamp_max_show_wrapper,
+		.write = cpu_uclamp_max_write_wrapper,
+	},
+	{
+		.name = "uclamp.latency_sensitive",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.read_u64 = cpu_uclamp_ls_read_u64_wrapper,
+		.write_u64 = cpu_uclamp_ls_write_u64_wrapper,
+	},
+	{
+		.name = "uclamp.boosted",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.read_u64 = cpu_uclamp_boost_read_u64_wrapper,
+		.write_u64 = cpu_uclamp_boost_write_u64_wrapper,
+	},
+#endif
 	{ }	/* terminate */
 };
+
+#ifdef CONFIG_UCLAMP_ASSIST
+struct ucl_param {
+	char *name;
+	char uclamp_min[3];
+	char uclamp_max[3];
+	u64  uclamp_latency_sensitive;
+	u64  uclamp_boosted;
+};
+
+static void uclamp_set(struct kernfs_open_file *of,
+		size_t nbytes, loff_t off)
+{
+	int i;
+
+	struct cpuset *cs = css_cs(of_css(of));
+
+	const char *cs_name = cs->css.cgroup->kn->name;
+
+	static struct ucl_param tgts[] = {
+		{"top-app",    	     	"10", "100", 1, 1},
+		{"foreground", 	     	"0",  "50",  1, 1},
+		{"restricted", 	    	"10", "40",  0, 0},
+		{"background", 	     	"20", "100", 0, 0},
+		{"system-background", 	"0",  "40",  0, 0},
+	};
+
+	for (i = 0; i < ARRAY_SIZE(tgts); i++) {
+		struct ucl_param tgt = tgts[i];
+
+		if (!strncmp(cs_name, tgt.name, strlen(tgt.name))) {
+			cpu_uclamp_min_write_wrapper(of, tgt.uclamp_min,
+				nbytes, off);
+			cpu_uclamp_max_write_wrapper(of, tgt.uclamp_max,
+				nbytes, off);
+			cpu_uclamp_ls_write_u64_wrapper(&cs->css, NULL,
+				tgt.uclamp_latency_sensitive);
+			cpu_uclamp_boost_write_u64_wrapper(&cs->css, NULL,
+				tgt.uclamp_boosted);
+
+			break;
+		}
+	}
+}
+#endif
 
 /*
  *	cpuset_css_alloc - allocate a cpuset css
@@ -2159,7 +2262,7 @@ static void cpuset_bind(struct cgroup_subsys_state *root_css)
  * which could have been changed by cpuset just after it inherits the
  * state from the parent and before it sits on the cgroup's task list.
  */
-void cpuset_fork(struct task_struct *task, void *priv)
+static void cpuset_fork(struct task_struct *task)
 {
 	if (task_css_is_root(task, cpuset_cgrp_id))
 		return;
@@ -2813,7 +2916,7 @@ void __cpuset_memory_pressure_bump(void)
 int proc_cpuset_show(struct seq_file *m, struct pid_namespace *ns,
 		     struct pid *pid, struct task_struct *tsk)
 {
-	char *buf, *p;
+	char *buf;
 	struct cgroup_subsys_state *css;
 	int retval;
 
@@ -2823,19 +2926,19 @@ int proc_cpuset_show(struct seq_file *m, struct pid_namespace *ns,
 		goto out;
 
 	retval = -ENAMETOOLONG;
-	rcu_read_lock();
-	css = task_css(tsk, cpuset_cgrp_id);
-	p = cgroup_path(css->cgroup, buf, PATH_MAX);
-	rcu_read_unlock();
-	if (!p)
+	css = task_get_css(tsk, cpuset_cgrp_id);
+	retval = cgroup_path_ns(css->cgroup, buf, PATH_MAX,
+				current->nsproxy->cgroup_ns);
+	css_put(css);
+	if (retval >= PATH_MAX)
 		goto out_free;
-	seq_puts(m, p);
+	seq_puts(m, buf);
 	seq_putc(m, '\n');
 	retval = 0;
 out_free:
 	kfree(buf);
 out:
-	return retval;
+	return 0;
 }
 #endif /* CONFIG_PROC_PID_CPUSET */
 
