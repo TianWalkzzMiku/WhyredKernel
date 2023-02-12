@@ -598,7 +598,6 @@ static int lpm_cpuidle_enter(struct cpuidle_device *dev,
 	if (!need_resched())
 		wfi();
 
-exit:
 	return idx;
 }
 
