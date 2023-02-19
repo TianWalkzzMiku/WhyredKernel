@@ -612,7 +612,6 @@ struct binder_transaction {
 	 * during thread teardown
 	 */
 	spinlock_t lock;
-	ANDROID_VENDOR_DATA(1);
 };
 
 /**
