@@ -28,8 +28,6 @@ struct mm_walk;
 struct mm_walk_ops {
 	int (*p4d_entry)(p4d_t *p4d, unsigned long addr,
 			 unsigned long next, struct mm_walk *walk);
-	int (*p4d_entry)(p4d_t *p4d, unsigned long addr,
-			 unsigned long next, struct mm_walk *walk);
 	int (*pud_entry)(pud_t *pud, unsigned long addr,
 			 unsigned long next, struct mm_walk *walk);
 	int (*pmd_entry)(pmd_t *pmd, unsigned long addr,
