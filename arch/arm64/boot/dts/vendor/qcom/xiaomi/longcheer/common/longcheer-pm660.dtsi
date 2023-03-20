@@ -71,6 +71,11 @@
 	qcom,fg-jeita-hyst-temp = <0>;
 };
 
+&pm660_haptics {
+	qcom,actuator-type = "erm";
+	qcom,vmax-mv = <3000>;
+};
+
 /* common diff with msm-pm660l.dtsi */
 &pm660l_wled {
 	/delete-property/ qcom,auto-calibration;
