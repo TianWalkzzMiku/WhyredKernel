@@ -12,4 +12,5 @@
 
 #include "xiaomi-sdm660-common.dtsi"
 #include "longcheer/common/longcheer-sdm660-base.dtsi"
+#include "longcheer/common/longcheer-sdm660-usbc.dtsi"
 #include "longcheer/lavender/lavender-base.dtsi"
