@@ -2435,7 +2435,7 @@ void scheduler_ipi(void)
 	/*
 	 * Check if someone kicked us for doing the nohz idle load balance.
 	 */
-	if (unlikely(got_nohz_idle_kick()) && !cpu_isolated(cpu)) {
+	if (unlikely(got_nohz_idle_kick())) {
 		this_rq()->idle_balance = 1;
 		raise_softirq_irqoff(SCHED_SOFTIRQ);
 	}
@@ -6857,18 +6857,17 @@ void set_rq_offline(struct rq *rq);
 
 int do_isolation_work_cpu_stop(void *data)
 {
+	unsigned long flags;
 	unsigned int cpu = smp_processor_id();
 	struct rq *rq = cpu_rq(cpu);
 	struct rq_flags rf;
 
-	local_irq_disable();
 
 	irq_migrate_all_off_this_cpu();
 
 	sched_ttwu_pending();
-
 	/* Update our root-domain */
-	rq_lock(rq, &rf);
+	raw_spin_lock_irqsave(&rq->lock, flags);
 
 	/*
 	 * Temporarily mark the rq as offline. This will allow us to
@@ -6880,13 +6879,10 @@ int do_isolation_work_cpu_stop(void *data)
 	}
 
 	migrate_tasks(rq, &rf, false);
-
 	if (rq->rd)
 		set_rq_online(rq);
-	rq_unlock(rq, &rf);
+	raw_spin_unlock_irqrestore(&rq->lock, flags);
 
-	clear_walt_request(cpu);
-	local_irq_enable();
 	return 0;
 }
 
